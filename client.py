@@ -23,25 +23,25 @@ class OpenAICompletionsEngine(Engine):
 
     async def process_query(self, session: ClientSession, query: str) -> str:
         response = await session.list_tools()
-        available_tools = [{
-            "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description,
-                "strict": True,
-                "parameters": {
-                    **tool.inputSchema,
-                    "additionalProperties": False
-                }
+        available_tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "strict": True,
+                    "parameters": {**tool.inputSchema, "additionalProperties": False},
+                },
             }
-        } for tool in response.tools]
+            for tool in response.tools
+        ]
 
         messages = [{"role": "user", "content": query}]
         response = await self.llm.chat.completions.create(
             model="gpt-4.1-nano",
             max_tokens=1000,
             messages=messages,
-            tools=available_tools
+            tools=available_tools,
         )
         print(response)
 
@@ -56,17 +56,21 @@ class OpenAICompletionsEngine(Engine):
                 tool_args = json.loads(tool_call.function.arguments)
 
                 result = await session.call_tool(tool_name, tool_args)
-                tool_results.append({
-                    "role": "tool",
-                    "content": result.content,
-                    "tool_call_id": tool_call.id
-                })
+                tool_results.append(
+                    {
+                        "role": "tool",
+                        "content": result.content,
+                        "tool_call_id": tool_call.id,
+                    }
+                )
                 final_text.append(f"[Calling tool {tool_name} with args {tool_args}]")
 
-            messages.append({
-                "role": "assistant",
-                "tool_calls": message.tool_calls,
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    "tool_calls": message.tool_calls,
+                }
+            )
             messages.extend(tool_results)
 
             response = await self.llm.chat.completions.create(
@@ -89,23 +93,23 @@ class OpenAIResponsesEngine(Engine):
 
     async def process_query(self, session: ClientSession, query: str) -> str:
         response = await session.list_tools()
-        available_tools = [{
-            "type": "function",
-            "name": tool.name,
-            "description": tool.description,
-            "strict": True,
-            "parameters": {
-                **tool.inputSchema,
-                "additionalProperties": False
+        available_tools = [
+            {
+                "type": "function",
+                "name": tool.name,
+                "description": tool.description,
+                "strict": True,
+                "parameters": {**tool.inputSchema, "additionalProperties": False},
             }
-        } for tool in response.tools]
+            for tool in response.tools
+        ]
 
         messages = [{"role": "user", "content": query}]
         response = await self.llm.responses.create(
             model="gpt-4.1-nano",
             max_output_tokens=1000,
             input=messages,
-            tools=available_tools
+            tools=available_tools,
         )
         print(response)
 
@@ -119,19 +123,23 @@ class OpenAIResponsesEngine(Engine):
                 tool_args = json.loads(resp.arguments)
 
                 result = await session.call_tool(tool_name, tool_args)
-                tool_results.append({
-                    "type": "function_call_output",
-                    "output": result.content[0].text,
-                    "call_id": resp.call_id
-                })
+                tool_results.append(
+                    {
+                        "type": "function_call_output",
+                        "output": result.content[0].text,
+                        "call_id": resp.call_id,
+                    }
+                )
                 final_text.append(f"[Calling tool {tool_name} with args {tool_args}]")
 
-                messages.append({
-                    "type": "function_call",
-                    "name": tool_name,
-                    "arguments": resp.arguments,
-                    "call_id": resp.call_id
-                })
+                messages.append(
+                    {
+                        "type": "function_call",
+                        "name": tool_name,
+                        "arguments": resp.arguments,
+                        "call_id": resp.call_id,
+                    }
+                )
             elif resp.type == "message":
                 for content in resp.content:
                     if content.type == "output_text":
@@ -165,32 +173,43 @@ class MCPClient:
         self.engine = engine
 
     async def connect_to_server(self, server_script_path: str):
-        is_python = server_script_path.endswith('.py')
-        is_js = server_script_path.endswith('.js')
+        is_python = server_script_path.endswith(".py")
+        is_js = server_script_path.endswith(".js")
         if not (is_python or is_js):
             raise ValueError("Server script must be a .py or .js file")
 
         command = "python" if is_python else "node"
         server_params = StdioServerParameters(
-            command=command,
-            args=[server_script_path],
-            env=None
+            command=command, args=[server_script_path], env=None
         )
 
-        stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
+        stdio_transport = await self.exit_stack.enter_async_context(
+            stdio_client(server_params)
+        )
         self.stdio, self.write = stdio_transport
-        self.session = await self.exit_stack.enter_async_context(ClientSession(self.stdio, self.write))
+        self.session = await self.exit_stack.enter_async_context(
+            ClientSession(self.stdio, self.write)
+        )
 
         await self.session.initialize()
 
         response = await self.session.list_tools()
         tools = response.tools
         print("\nConnected to server with tools:", [tool.name for tool in tools])
-        print("\nSchema:", json.dumps([{
-            "name": tool.name,
-            "description": tool.description,
-            "inputSchema": tool.inputSchema
-        } for tool in tools], indent=2))
+        print(
+            "\nSchema:",
+            json.dumps(
+                [
+                    {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "inputSchema": tool.inputSchema,
+                    }
+                    for tool in tools
+                ],
+                indent=2,
+            ),
+        )
 
     async def chat_loop(self):
         print("\nMCP Client Started!")
@@ -200,7 +219,7 @@ class MCPClient:
             try:
                 query = input("\nQuery: ").strip()
 
-                if query.lower() == 'quit':
+                if query.lower() == "quit":
                     break
 
                 response = await self.engine.process_query(self.session, query)
