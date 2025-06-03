@@ -1,5 +1,6 @@
 from typing import Any
 import httpx
+import argparse
 from mcp.server.fastmcp import FastMCP
 
 # Initialize FastMCP server
@@ -91,6 +92,19 @@ Forecast: {period["detailedForecast"]}
     return "\n---\n".join(forecasts)
 
 
+def main():
+    parser = argparse.ArgumentParser(description="Weather API server")
+    parser.add_argument(
+        "--transport",
+        type=str,
+        choices=["streamable-http", "stdio"],
+        default="stdio",
+        help="Transport method: streamable-http or stdio",
+    )
+
+    args = parser.parse_args()
+    mcp.run(transport=args.transport)
+
+
 if __name__ == "__main__":
-    # Initialize and run the server
-    mcp.run(transport="stdio")
+    main()
