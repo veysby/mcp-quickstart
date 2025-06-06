@@ -4,9 +4,25 @@ Basic MCP server from the Model Context Protocol (MCP) [Quickstart Guide](https:
 adapted to work with the OpenAI chat completions and responses API's
 
 ## Notes
+- MCP configuration
+  ```json
+  {
+    "mcpServers": {
+      "weather": {
+        "command": "uv",
+        "args": [
+          "--directory",
+          "<project_folder>",
+          "run",
+          "weather.py"
+        ]
+      }
+    }
+  }
+  ```
 - MCP inspector was very helpful in troubleshooting basic configuration issues
   ```sh
-  npx @modelcontextprotocol/inspector uv run weather.py
+  npx @modelcontextprotocol/inspector
   ```
 - Claude desktop works fine with this server
 - I was not able to make this server work in PyCharm > AI Assistant > Model Context Protocol (MCP)
