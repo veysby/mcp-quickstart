@@ -1,0 +1,25 @@
+### Iniailize connection to mcp server
+POST http://127.0.0.1:8000/mcp/
+accept: application/json, text/event-stream
+content-type: application/json
+accept-encoding: gzip, deflate
+
+{
+  "jsonrpc": "2.0",
+  "id": 0,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-03-26",
+    "capabilities": {
+      "sampling": {},
+      "roots": {
+        "listChanged": true
+      }
+    },
+    "clientInfo": {
+      "name": "mcp-inspector",
+      "version": "0.14.0"
+    }
+  }
+}
+###
