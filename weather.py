@@ -4,7 +4,20 @@ import argparse
 from mcp.server.fastmcp import FastMCP
 
 # Initialize FastMCP server
-mcp = FastMCP("weather")
+mcp = FastMCP(
+    "weather",
+    instructions=(
+        "This server provides weather information for US locations using the "
+        "National Weather Service API.\n\n"
+        "Available tools:\n"
+        "- get_alerts(state): Retrieves active weather alerts for a US state. "
+        "Requires a two-letter state code (e.g. 'CA', 'NY', 'TX').\n"
+        "- get_forecast(latitude, longitude): Retrieves a multi-period weather "
+        "forecast for a specific location. Requires decimal latitude and longitude "
+        "coordinates (e.g. latitude=37.7749, longitude=-122.4194 for San Francisco). "
+        "Only works for locations within the continental United States."
+    ),
+)
 
 # Constants
 NWS_API_BASE = "https://api.weather.gov"
