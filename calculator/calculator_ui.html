@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Calculator</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 16px;
+            background-color: transparent;
+        }
+        .calculator {
+            background-color: #333;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            width: 280px;
+        }
+        .display {
+            background-color: #222;
+            color: #fff;
+            font-size: 2.5rem;
+            text-align: right;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            min-height: 4rem;
+            word-wrap: break-word;
+            overflow: hidden;
+        }
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        button {
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        button:active { opacity: 0.7; }
+        .number   { background-color: #555; color: white; }
+        .operator { background-color: #f39c12; color: white; }
+        .action   { background-color: #a5a5a5; color: black; }
+        .zero     { grid-column: span 2; width: 130px; border-radius: 30px; }
+        .status {
+            margin-top: 10px;
+            color: #888;
+            font-size: 0.8rem;
+            text-align: center;
+            height: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <div class="display" id="display">0</div>
+        <div class="buttons">
+            <button class="action"   onclick="clearDisplay()">AC</button>
+            <button class="action"   onclick="toggleSign()">+/-</button>
+            <button class="action"   onclick="percent()">%</button>
+            <button class="operator" onclick="setOperator('divide')">÷</button>
+
+            <button class="number"   onclick="appendNumber('7')">7</button>
+            <button class="number"   onclick="appendNumber('8')">8</button>
+            <button class="number"   onclick="appendNumber('9')">9</button>
+            <button class="operator" onclick="setOperator('multiply')">×</button>
+
+            <button class="number"   onclick="appendNumber('4')">4</button>
+            <button class="number"   onclick="appendNumber('5')">5</button>
+            <button class="number"   onclick="appendNumber('6')">6</button>
+            <button class="operator" onclick="setOperator('subtract')">−</button>
+
+            <button class="number"   onclick="appendNumber('1')">1</button>
+            <button class="number"   onclick="appendNumber('2')">2</button>
+            <button class="number"   onclick="appendNumber('3')">3</button>
+            <button class="operator" onclick="setOperator('add')">+</button>
+
+            <button class="number zero" onclick="appendNumber('0')">0</button>
+            <button class="number"   onclick="appendNumber('.')">.</button>
+            <button class="operator" onclick="calculate()">=</button>
+        </div>
+        <div class="status" id="status">Connecting…</div>
+    </div>
+
+    <script>
+        // ── MCP Apps bridge ──────────────────────────────────────────────────
+        // Implements the ui/initialize handshake from the ext-apps spec
+        // (protocol version 2026-01-26) so Claude Desktop / MCP Inspector
+        // can mount and tear down the view correctly.
+
+        const PROTOCOL_VERSION = "2026-01-26";
+
+        let rpcId = 0;
+        const pending = new Map(); // id → { resolve, reject }
+
+        window.addEventListener("message", (event) => {
+            const msg = event.data;
+            if (!msg || msg.jsonrpc !== "2.0") return;
+
+            // ── Response to one of our requests ──
+            if (msg.id !== undefined && pending.has(msg.id)) {
+                const { resolve, reject } = pending.get(msg.id);
+                pending.delete(msg.id);
+                if (msg.error) reject(new Error(msg.error.message ?? JSON.stringify(msg.error)));
+                else resolve(msg.result);
+                return;
+            }
+
+            // ── Host → View requests ──
+            if (msg.method === "ui/resource-teardown") {
+                window.parent.postMessage({ jsonrpc: "2.0", id: msg.id, result: {} }, "*");
+            }
+        });
+
+        function send(method, params) {
+            return new Promise((resolve, reject) => {
+                const id = ++rpcId;
+                pending.set(id, { resolve, reject });
+                window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
+            });
+        }
+
+        function notify(method, params) {
+            window.parent.postMessage({ jsonrpc: "2.0", method, params }, "*");
+        }
+
+        async function callTool(name, args) {
+            return send("tools/call", { name, arguments: args });
+        }
+
+        // ── Handshake ────────────────────────────────────────────────────────
+        async function connect() {
+            try {
+                await send("ui/initialize", {
+                    protocolVersion: PROTOCOL_VERSION,
+                    appInfo: { name: "Calculator", version: "1.0.0" },
+                    appCapabilities: {},
+                });
+                notify("ui/notifications/initialized", {});
+            } catch (e) {
+                console.error("MCP Apps init failed:", e);
+            }
+            status.innerText = "Ready"; // show ready regardless — still usable without host
+        }
+
+        // ── Calculator logic ─────────────────────────────────────────────────
+        let currentInput = "0";
+        let previousInput = null;
+        let operator = null;
+        let waitingForSecond = false;
+
+        const display = document.getElementById("display");
+        const status  = document.getElementById("status");
+
+        function updateDisplay() { display.innerText = currentInput; }
+
+        function appendNumber(num) {
+            if (waitingForSecond) {
+                currentInput = num;
+                waitingForSecond = false;
+            } else {
+                currentInput = currentInput === "0" ? num : currentInput + num;
+            }
+            updateDisplay();
+        }
+
+        function clearDisplay() {
+            currentInput = "0";
+            previousInput = null;
+            operator = null;
+            waitingForSecond = false;
+            updateDisplay();
+            status.innerText = "Ready";
+        }
+
+        function setOperator(op) {
+            previousInput = currentInput;
+            operator = op;
+            waitingForSecond = true;
+            status.innerText = "Op: " + op;
+        }
+
+        async function calculate() {
+            if (!operator || waitingForSecond) return;
+            const a = parseFloat(previousInput);
+            const b = parseFloat(currentInput);
+            status.innerText = "Calculating…";
+            try {
+                const result = await callTool(operator, { a, b });
+                let val;
+                if (result?.content?.[0]?.text !== undefined) {
+                    val = result.content[0].text;
+                } else if (result?.text !== undefined) {
+                    val = result.text;
+                } else {
+                    val = String(result);
+                }
+                currentInput = String(val);
+                operator = null;
+                waitingForSecond = false;
+                updateDisplay();
+                status.innerText = "Ready";
+            } catch (err) {
+                console.error("Calculation failed", err);
+                status.innerText = "Error: " + (err.message || "failed");
+            }
+        }
+
+        function toggleSign() {
+            currentInput = String(parseFloat(currentInput) * -1);
+            updateDisplay();
+        }
+
+        function percent() {
+            currentInput = String(parseFloat(currentInput) / 100);
+            updateDisplay();
+        }
+
+        // ── Report content size so the host can resize the iframe ────────────
+        function reportSize() {
+            const { scrollWidth: width, scrollHeight: height } = document.documentElement;
+            notify("ui/notifications/size-changed", { width, height });
+        }
+
+        const resizeObserver = new ResizeObserver(() => reportSize());
+        resizeObserver.observe(document.documentElement);
+
+        // Kick off the handshake, then report initial size
+        connect().then(() => reportSize());
+    </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+[project]
+name = "calculator"
+version = "0.1.0"
+description = "Basic calculator MCP server with resources"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "mcp[cli]>=1.9.1",
+]
