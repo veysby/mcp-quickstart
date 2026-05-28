@@ -1,6 +1,5 @@
 import math
 import os
-from typing import List, Dict, Any
 from mcp.server.fastmcp import FastMCP
 
 # Initialize FastMCP server
@@ -9,28 +8,22 @@ mcp = FastMCP(
     instructions="A basic calculator server that supports standard arithmetic operations and provides access to calculation history and mathematical constants through resources."
 )
 
-# In-memory storage for calculation history
-history: List[Dict[str, Any]] = []
-
 @mcp.tool()
 def add(a: float, b: float) -> float:
     """Add two numbers."""
     result = a + b
-    history.append({"operation": "add", "a": a, "b": b, "result": result})
     return result
 
 @mcp.tool()
 def subtract(a: float, b: float) -> float:
     """Subtract b from a."""
     result = a - b
-    history.append({"operation": "subtract", "a": a, "b": b, "result": result})
     return result
 
 @mcp.tool()
 def multiply(a: float, b: float) -> float:
     """Multiply two numbers."""
     result = a * b
-    history.append({"operation": "multiply", "a": a, "b": b, "result": result})
     return result
 
 @mcp.tool()
@@ -39,33 +32,10 @@ def divide(a: float, b: float) -> float:
     if b == 0:
         raise ValueError("Cannot divide by zero")
     result = a / b
-    history.append({"operation": "divide", "a": a, "b": b, "result": result})
     return result
 
-@mcp.resource("calc://history")
-def get_history() -> str:
-    """Get the history of all calculations performed in this session."""
-    if not history:
-        return "No calculations performed yet."
-    
-    lines = []
-    for i, entry in enumerate(history):
-        lines.append(f"{i}: {entry['a']} {entry['operation']} {entry['b']} = {entry['result']}")
-    return "\n".join(lines)
-
-@mcp.resource("calc://history/{index}")
-def get_history_entry(index: int) -> str:
-    """Get a specific calculation from history by its index."""
-    try:
-        entry = history[index]
-        return f"Calculation {index}:\nOperation: {entry['operation']}\nInput A: {entry['a']}\nInput B: {entry['b']}\nResult: {entry['result']}"
-    except IndexError:
-        return f"Error: No calculation found at index {index}"
-    except ValueError:
-        return "Error: Index must be an integer"
-
 @mcp.resource("calc://constants")
-def get_constants() -> Dict[str, float]:
+def get_constants() -> dict[str, float]:
     """Get a list of common mathematical constants."""
     return {
         "pi": math.pi,
