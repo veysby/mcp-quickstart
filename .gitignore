@@ -12,3 +12,6 @@ wheels/
 # Pycharm
 .idea
 .junie
+
+# Env config
+.env

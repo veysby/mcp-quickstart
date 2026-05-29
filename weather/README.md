@@ -1,7 +1,10 @@
 # MCP Quickstart
 
 Basic MCP server from the Model Context Protocol (MCP) [Quickstart Guide](https://modelcontextprotocol.io/quickstart/server)
-adapted to work with the OpenAI chat completions and responses API's
+with a custom client demonstrating three engine implementations:
+- `OpenAICompletionsEngine` — OpenAI Chat Completions API with manual tool-call loop
+- `OpenAIResponsesEngine` — OpenAI Responses API with manual tool-call loop
+- `LangChainEngine` — LangChain `create_agent` with automatic tool-call loop via LangGraph
 
 ## Notes
 - MCP configuration

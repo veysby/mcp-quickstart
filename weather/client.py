@@ -6,9 +6,15 @@ from abc import ABC, abstractmethod
 from contextlib import AsyncExitStack
 from typing import Optional
 
+from dotenv import load_dotenv
+from langchain_mcp_adapters.tools import load_mcp_tools
+from langchain_openai import ChatOpenAI
+from langchain.agents import create_agent
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from openai import AsyncOpenAI
+
+load_dotenv()
 
 
 class Engine(ABC):
@@ -166,6 +172,17 @@ class OpenAIResponsesEngine(Engine):
         return "\n".join(final_text)
 
 
+class LangChainEngine(Engine):
+    def __init__(self):
+        self.llm = ChatOpenAI(model="gpt-4.1-nano")
+
+    async def process_query(self, session: ClientSession, query: str) -> str:
+        tools = await load_mcp_tools(session)
+        agent = create_agent(self.llm, tools)
+        result = await agent.ainvoke({"messages": [{"role": "user", "content": query}]})
+        return result["messages"][-1].content
+
+
 class MCPClient:
     def __init__(self, engine):
         self.session: Optional[ClientSession] = None
@@ -237,7 +254,7 @@ async def main():
         print("Usage: python client.py <path_to_server_script>")
         sys.exit(1)
 
-    engine = OpenAIResponsesEngine()
+    engine = LangChainEngine()
     client = MCPClient(engine)
     try:
         await client.connect_to_server(sys.argv[1])
